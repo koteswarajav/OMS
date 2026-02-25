@@ -264,11 +264,11 @@ function ConnectionRow({ conn }: { conn: Connection }) {
   const hasOverride = rOverride !== null || aOverride !== null
 
   return (
-    <div className={`flex items-center gap-4 px-5 py-3.5 border rounded-xl bg-white transition-all
-      ${hasOverride ? 'border-blue-200' : 'border-gray-100'}`}>
+    <div className={`flex items-start gap-4 px-5 py-4 border rounded-lg bg-white transition-all
+      ${hasOverride ? 'border-blue-200 shadow-sm shadow-blue-100' : 'border-gray-100 hover:border-gray-200'}`}>
 
       {/* Connection info */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pt-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-gray-900">{conn.name}</span>
           <span className="text-xs text-gray-400">{conn.app}</span>
@@ -278,18 +278,18 @@ function ConnectionRow({ conn }: { conn: Connection }) {
       </div>
 
       {/* Aggregation column */}
-      <div className="w-[160px] flex flex-col items-center gap-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">{aggOn ? 'On' : 'Off'}</span>
+      <div className="w-[160px] flex flex-col items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-500">{aggOn ? 'On' : 'Off'}</span>
           <Toggle on={aggOn} onToggle={() => setAggOn(v => !v)} />
         </div>
         {aggOn && <AggregationCell override={aOverride} onSave={setAO} onReset={() => setAO(null)} />}
       </div>
 
       {/* Routing column */}
-      <div className="w-[140px] flex flex-col items-center gap-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">{rteOn ? 'On' : 'Off'}</span>
+      <div className="w-[140px] flex flex-col items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-500">{rteOn ? 'On' : 'Off'}</span>
           <Toggle on={rteOn} onToggle={() => setRteOn(v => !v)} />
         </div>
         {rteOn && <RoutingCell override={rOverride} onSave={setRO} onReset={() => setRO(null)} />}
@@ -303,26 +303,26 @@ function ConnectionRow({ conn }: { conn: Connection }) {
 function ChannelRow({ ch }: { ch: Channel }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className={`bg-white border rounded-xl shadow-sm overflow-visible ${open ? 'border-blue-200' : 'border-gray-200 hover:border-gray-300'} transition-all`}>
+    <div className={`bg-white border rounded-lg overflow-visible transition-all ${open ? 'border-blue-200 shadow-md shadow-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
       <button onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors text-left">
-        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
           style={{ background: ch.color }}>
           {ch.initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-gray-900">{ch.name}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{ch.connections.length} connections</div>
+          <div className="text-xs text-gray-500 mt-0.5">{ch.connections.length} connection{ch.connections.length !== 1 ? 's' : ''}</div>
         </div>
-        <div className="flex items-center gap-6 flex-shrink-0">
+        <div className="flex items-center gap-8 flex-shrink-0">
           <div className="w-[160px] flex justify-center">
             <Badge variant={ch.aggregationOn > 0 ? 'success' : 'neutral'}>
-              {ch.aggregationOn}/{ch.connections.length} aggregation
+              {ch.aggregationOn}/{ch.connections.length} on
             </Badge>
           </div>
           <div className="w-[140px] flex justify-center">
             <Badge variant={ch.routingOn > 0 ? 'primary' : 'neutral'}>
-              {ch.routingOn}/{ch.connections.length} routing
+              {ch.routingOn}/{ch.connections.length} on
             </Badge>
           </div>
         </div>
@@ -332,8 +332,8 @@ function ChannelRow({ ch }: { ch: Channel }) {
       </button>
 
       {open && (
-        <div className="border-t border-gray-100 px-5 py-4 flex flex-col gap-2 bg-gray-50/40">
-          <div className="flex items-center px-5 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="border-t border-gray-100 px-5 py-4 flex flex-col gap-3 bg-gray-50/50">
+          <div className="flex items-center px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
             <div className="flex-1">Connection</div>
             <div className="w-[160px] text-center">Aggregation</div>
             <div className="w-[140px] text-center">Routing</div>
@@ -349,115 +349,31 @@ function ChannelRow({ ch }: { ch: Channel }) {
 
 function ChannelsTab() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-gray-400 bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+    <div className="flex flex-col gap-8">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2.5 text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
           <IcoInfo />
-          <span>Global defaults: <strong className="text-gray-600 font-semibold">WMS 1</strong> for both routing &amp; aggregation</span>
+          <span>Global defaults: <strong className="font-semibold text-gray-900">WMS 1</strong> for both routing &amp; aggregation</span>
         </div>
         <Button label="Manage Connections" variant="secondary" size="sm" />
       </div>
 
       {/* Table header */}
-      <div className="flex items-center px-5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+      <div className="flex items-center px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
         <div className="flex-1">Channel</div>
         <div className="w-[160px] text-center">Aggregation</div>
         <div className="w-[140px] text-center">Routing</div>
         <div className="w-8" />
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {CHANNELS.map(ch => <ChannelRow key={ch.id} ch={ch} />)}
       </div>
     </div>
   )
 }
 
-// ─── Order Aggregation Tab ────────────────────────────────────────────────────
 
-function OrderAggregationTab() {
-  const [prefix,     setPrefix]     = useState('BATCH')
-  const [digits,     setDigits]     = useState('6')
-  const [startVal,   setStartVal]   = useState('1')
-  const [increment,  setIncrement]  = useState('1')
-
-  const preview = (() => {
-    const n = Math.max(1, parseInt(digits) || 6)
-    const s = parseInt(startVal) || 1
-    return (prefix ? `${prefix}-` : '') + String(s).padStart(n, '0')
-  })()
-
-  return (
-    <div className="flex flex-col gap-8">
-
-      {/* ID Format */}
-      <div>
-        <SectionHeader
-          title="Aggregated Order ID Format"
-          subtitle="Define how aggregated order IDs are generated. Changes apply to new batches only."
-        />
-        <Card>
-          <div className="grid grid-cols-2 gap-5 p-1">
-            <Field label="Prefix" hint="Optional string prefix prepended to the numeric part.">
-              <Input value={prefix} onChange={setPrefix} placeholder="e.g. BATCH" />
-            </Field>
-            <Field label="Number of Digits" hint="Total digits, zero-padded on the left.">
-              <Input value={digits} onChange={setDigits} type="number" placeholder="6" />
-            </Field>
-            <Field label="Start Value" hint="First numeric value in the sequence.">
-              <Input value={startVal} onChange={setStartVal} type="number" placeholder="1" />
-            </Field>
-            <Field label="Increment" hint="Step size between consecutive IDs.">
-              <Input value={increment} onChange={setIncrement} type="number" placeholder="1" />
-            </Field>
-          </div>
-
-          {/* Preview */}
-          <div className="mt-5 pt-5 border-t border-gray-100 px-1">
-            <Field label="Live Preview">
-              <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <span className="text-sm font-mono font-bold text-blue-700 tracking-widest">{preview}</span>
-                <span className="text-xs text-blue-400 ml-auto">First aggregated order ID</span>
-              </div>
-            </Field>
-            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-              IDs are left-padded to match Number of Digits. Capacity: {10 ** (parseInt(digits) || 6) - 1} max orders.
-              Alerts trigger at 90% usage.
-            </p>
-          </div>
-        </Card>
-      </div>
-
-      {/* Aggregation Window */}
-      <div>
-        <SectionHeader
-          title="Aggregation Window"
-          subtitle="Control when orders are collected into a batch."
-        />
-        <Card>
-          <div className="divide-y divide-gray-100">
-            {[
-              { label: 'Auto-close after',       value: '30 minutes', hint: 'Batch closes automatically after this duration from the first order.' },
-              { label: 'Maximum orders per batch', value: '200 orders', hint: 'Batch closes when this limit is reached, even before the time window.' },
-            ].map(row => (
-              <div key={row.label} className="flex items-center justify-between py-4 px-1 first:pt-1 last:pb-1">
-                <div>
-                  <div className="text-sm font-semibold text-gray-800">{row.label}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{row.hint}</div>
-                </div>
-                <div className="text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg">{row.value}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <InfoBanner>
-        Orders included in aggregation do not go through routing. Individual orders that don't meet aggregation criteria may still be routed.
-      </InfoBanner>
-    </div>
-  )
-}
 
 // ─── Order Routing Tab ────────────────────────────────────────────────────────
 
@@ -660,14 +576,318 @@ function OrderRoutingTab() {
   )
 }
 
+// ─── Combined Settings Tab ────────────────────────────────────────────────────
+
+function OrderAggregationAndRoutingTab() {
+  // Aggregation state
+  const [prefix,     setPrefix]     = useState('BATCH')
+  const [digits,     setDigits]     = useState('6')
+  const [startVal,   setStartVal]   = useState('1')
+  const [increment,  setIncrement]  = useState('1')
+
+  // Routing state
+  const [defaultLoc,  setDefaultLoc]  = useState('')
+  const [allowMulti,  setAllowMulti]  = useState(false)
+  const [allowSplit,  setAllowSplit]  = useState(false)
+  const [rules,       setRules]       = useState<RoutingRule[]>(DEFAULT_RULES)
+
+  const preview = (() => {
+    const n = Math.max(1, parseInt(digits) || 6)
+    const s = parseInt(startVal) || 1
+    return (prefix ? `${prefix}-` : '') + String(s).padStart(n, '0')
+  })()
+
+  const addRule = () => setRules(r => [
+    ...r,
+    { id: `r${Date.now()}`, priority: r.length + 1, condField: 'country', condOp: 'equals', condValue: '', action: 'WMS 1' },
+  ])
+  const removeRule = (id: string) => setRules(r => r.filter(x => x.id !== id).map((x, i) => ({ ...x, priority: i + 1 })))
+  const updateRule = (id: string, patch: Partial<RoutingRule>) =>
+    setRules(r => r.map(x => x.id === id ? { ...x, ...patch } : x))
+
+  return (
+    <div className="flex flex-col gap-10">
+
+      {/* ═══ ORDER AGGREGATION SECTION ═══════════════════════════════════════════ */}
+      
+      <div>
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Order Aggregation</h3>
+          <p className="text-sm text-gray-500 mt-1.5">Configure how orders are collected and batched together.</p>
+        </div>
+
+        <div className="flex flex-col gap-8">
+
+          {/* ID Format */}
+          <div>
+            <SectionHeader
+              title="Aggregated Order ID Format"
+              subtitle="Define how aggregated order IDs are generated. Changes apply to new batches only."
+            />
+            <Card>
+              <div className="grid grid-cols-2 gap-5 p-1">
+                <Field label="Prefix" hint="Optional string prefix prepended to the numeric part.">
+                  <Input value={prefix} onChange={setPrefix} placeholder="e.g. BATCH" />
+                </Field>
+                <Field label="Number of Digits" hint="Total digits, zero-padded on the left.">
+                  <Input value={digits} onChange={setDigits} type="number" placeholder="6" />
+                </Field>
+                <Field label="Start Value" hint="First numeric value in the sequence.">
+                  <Input value={startVal} onChange={setStartVal} type="number" placeholder="1" />
+                </Field>
+                <Field label="Increment" hint="Step size between consecutive IDs.">
+                  <Input value={increment} onChange={setIncrement} type="number" placeholder="1" />
+                </Field>
+              </div>
+
+              {/* Preview */}
+              <div className="mt-6 pt-6 border-t border-gray-100 px-1">
+                <Field label="Live Preview">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm font-mono font-bold text-blue-700 tracking-widest">{preview}</span>
+                    <span className="text-xs text-blue-400 ml-auto">First aggregated order ID</span>
+                  </div>
+                </Field>
+                <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                  IDs are left-padded to match Number of Digits. Capacity: {10 ** (parseInt(digits) || 6) - 1} max orders.
+                  Alerts trigger at 90% usage.
+                </p>
+              </div>
+            </Card>
+          </div>
+
+          {/* Aggregation Window */}
+          <div>
+            <SectionHeader
+              title="Aggregation Window"
+              subtitle="Control when orders are collected into a batch."
+            />
+            <Card>
+              <div className="divide-y divide-gray-100">
+                {[
+                  { label: 'Auto-close after',       value: '30 minutes', hint: 'Batch closes automatically after this duration from the first order.' },
+                  { label: 'Maximum orders per batch', value: '200 orders', hint: 'Batch closes when this limit is reached, even before the time window.' },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between py-4 px-1 first:pt-1 last:pb-1">
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-gray-900">{row.label}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{row.hint}</div>
+                    </div>
+                    <div className="text-sm font-semibold text-gray-700 ml-6">{row.value}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Visual divider */}
+      <div className="h-px bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
+
+      {/* ═══ ORDER ROUTING SECTION ════════════════════════════════════════════════ */}
+
+      <div>
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Order Routing</h3>
+          <p className="text-sm text-gray-500 mt-1.5">Configure routing rules and fulfillment location strategies.</p>
+        </div>
+
+        <div className="flex flex-col gap-8">
+
+          {/* Default Fulfillment Location */}
+          <div>
+            <SectionHeader
+              title="Default Fulfillment Location"
+              subtitle="Fallback location used when no routing rule matches an order."
+            />
+            <Card>
+              <div className="p-1">
+                <Field label="Default Fulfillment Location" hint="If not set, unmatched orders are held for manual review.">
+                  <Select value={defaultLoc} onChange={setDefaultLoc} placeholder="Search fulfillment locations…">
+                    <option value="wms1">WMS 1</option>
+                    <option value="wms2">WMS 2</option>
+                  </Select>
+                </Field>
+                {defaultLoc && (
+                  <button onClick={() => setDefaultLoc('')} className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors">
+                    ✕ Clear selection
+                  </button>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Split Configuration */}
+          <div>
+            <SectionHeader
+              title="Split Configuration"
+              subtitle="Control whether orders and line items can span multiple fulfillment location."
+            />
+            <Card style={{ padding: 0 }}>
+              <div className="divide-y divide-gray-100">
+
+                <div className="flex items-start justify-between gap-6 px-5 py-4">
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-gray-900">Allow multiple fulfillment locations for an order</div>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      {allowMulti
+                        ? 'Different line items in the same order can use different locations.'
+                        : 'The entire order must be fulfilled from a single location.'}
+                    </p>
+                  </div>
+                  <Toggle on={allowMulti} onToggle={() => { setAllowMulti(v => !v); if (allowMulti) setAllowSplit(false) }} />
+                </div>
+
+                <div className={`flex items-start justify-between gap-6 px-5 py-4 transition-opacity ${!allowMulti ? 'opacity-50' : ''}`}>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-gray-900">Allow multiple fulfillment locations for a line item</span>
+                      {!allowMulti && (
+                        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      {allowSplit
+                        ? 'A single line item can be split across locations when inventory is low.'
+                        : 'Each line item is fulfilled from one location only.'}
+                    </p>
+                    {!allowMulti && <p className="text-xs text-amber-600 mt-1.5 font-medium">Requires "Allow multiple locations for an order" to be enabled.</p>}
+                  </div>
+                  <Toggle on={allowSplit} onToggle={() => setAllowSplit(v => !v)} disabled={!allowMulti} />
+                </div>
+
+              </div>
+            </Card>
+          </div>
+
+          {/* Routing Rules */}
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Routing Rules</h2>
+                <p className="text-xs text-gray-500 mt-1">Rules are evaluated in priority order. First match wins.</p>
+              </div>
+              <Button label="+ Add Rule" variant="secondary" size="sm" onClick={addRule} />
+            </div>
+
+            <Card style={{ padding: 0 }}>
+              {/* Table header */}
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wider rounded-t-xl">
+                <div className="w-5" />
+                <div className="w-8 text-center">#</div>
+                <div className="flex-1">Condition</div>
+                <div className="w-32">Route To</div>
+                <div className="w-8" />
+              </div>
+
+              {rules.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-700">No routing rules</p>
+                  <p className="text-xs text-gray-400 mt-1">All orders will use the default fulfillment location.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {rules.map(rule => (
+                    <div key={rule.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors group">
+                      <div className="w-5 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+                        <IcoGrip />
+                      </div>
+                      <div className="w-8 text-center">
+                        <span className="text-xs font-bold text-gray-400 bg-gray-100 rounded-full w-5 h-5 inline-flex items-center justify-center">
+                          {rule.priority}
+                        </span>
+                      </div>
+
+                      {/* Condition */}
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        <select
+                          value={rule.condField}
+                          onChange={e => updateRule(rule.id, { condField: e.target.value })}
+                          className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-32"
+                        >
+                          <option value="country">Country</option>
+                          <option value="tag">Order Tag</option>
+                          <option value="channel">Channel</option>
+                          <option value="sku">SKU</option>
+                          <option value="total">Order Total</option>
+                        </select>
+                        <select
+                          value={rule.condOp}
+                          onChange={e => updateRule(rule.id, { condOp: e.target.value })}
+                          className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-28"
+                        >
+                          <option value="equals">equals</option>
+                          <option value="not_equals">not equals</option>
+                          <option value="contains">contains</option>
+                          <option value="starts_with">starts with</option>
+                          <option value="greater_than">greater than</option>
+                        </select>
+                        <input
+                          value={rule.condValue}
+                          onChange={e => updateRule(rule.id, { condValue: e.target.value })}
+                          placeholder="value…"
+                          className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 flex-1"
+                        />
+                      </div>
+
+                      {/* Action */}
+                      <div className="w-32">
+                        <select
+                          value={rule.action}
+                          onChange={e => updateRule(rule.id, { action: e.target.value })}
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="WMS 1">WMS 1</option>
+                          <option value="WMS 2">WMS 2</option>
+                        </select>
+                      </div>
+
+                      {/* Delete */}
+                      <button
+                        onClick={() => removeRule(rule.id)}
+                        className="w-8 flex items-center justify-center text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <IcoTrash />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              {rules.length > 0 && (
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 rounded-b-xl">
+                  <p className="text-xs text-gray-400">
+                    <strong className="text-gray-500">{rules.length} rule{rules.length !== 1 ? 's' : ''}</strong> · Drag to reorder priority · Unmatched orders fall back to default location
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-type Tab = 'channels' | 'aggregation' | 'routing'
+type Tab = 'channels' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'channels',    label: 'Channels' },
-  { id: 'aggregation', label: 'Order Aggregation' },
-  { id: 'routing',     label: 'Order Routing' },
+  { id: 'channels', label: 'Channel Management' },
+  { id: 'settings', label: 'Order Aggregation and Order Routing' },
 ]
 
 export default function ChannelManagementAndRouting() {
@@ -678,16 +898,16 @@ export default function ChannelManagementAndRouting() {
       <div className="max-w-5xl mx-auto px-8 pt-8 pb-16">
 
         {/* Page header */}
-        <div className="mb-6">
-          <p className="text-xs text-gray-400 mb-2">
+        <div className="mb-10">
+          <p className="text-xs text-gray-400 mb-3">
             <span className="hover:text-gray-600 cursor-pointer transition-colors">Settings</span>
             <span className="mx-1.5 text-gray-300">/</span>
             <span className="text-gray-600 font-medium">Channel Management</span>
           </p>
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900">Channel Management</h1>
-              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-xl">
+          <div className="flex items-end justify-between gap-6">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900">Channel Management</h1>
+              <p className="text-sm text-gray-600 mt-2 leading-relaxed max-w-2xl">
                 Configure which connections participate in order aggregation and routing, and define global rules.
               </p>
             </div>
@@ -705,10 +925,10 @@ export default function ChannelManagementAndRouting() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`px-5 py-3 text-sm font-semibold border-b-[3px] transition-colors whitespace-nowrap
+                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors
                   ${tab === t.id
                     ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'}`}
+                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'}`}
               >
                 {t.label}
               </button>
@@ -717,13 +937,14 @@ export default function ChannelManagementAndRouting() {
         </div>
 
         {/* Tab content */}
-        {tab === 'channels'    && <ChannelsTab />}
-        {tab === 'aggregation' && <OrderAggregationTab />}
-        {tab === 'routing'     && <OrderRoutingTab />}
+        <div className="min-h-96">
+          {tab === 'channels' && <ChannelsTab />}
+          {tab === 'settings' && <OrderAggregationAndRoutingTab />}
+        </div>
 
         {/* Footer actions — only on config tabs */}
         {tab !== 'channels' && (
-          <div className="flex items-center justify-end gap-3 mt-10 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 mt-12 pt-8 border-t border-gray-200">
             <Button label="Cancel" variant="secondary" />
             <Button label="Save changes" variant="primary" />
           </div>
