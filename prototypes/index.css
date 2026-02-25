@@ -1,3 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@source "../screens/**/*.tsx";
+@source "../variants/**/*.tsx";
+@source "../flows/**/*.tsx";
+@source "../prototypes/**/*.tsx";
+@source "../design-system/**/*.tsx";
