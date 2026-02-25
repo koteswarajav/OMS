@@ -394,27 +394,72 @@ function OrderRoutingTab() {
   return (
     <div className="flex flex-col gap-8">
 
-      {/* Default Fulfillment Location */}
+      {/* Default Warehouse Locations */}
       <div>
-        <SectionHeader
-          title="Default Fulfillment Location"
-          subtitle="Fallback location used when no routing rule matches an order."
-        />
-        <Card>
-          <div className="p-1">
-            <Field label="Default Fulfillment Location" hint="If not set, unmatched orders are held for manual review.">
-              <Select value={defaultLoc} onChange={setDefaultLoc} placeholder="Search fulfillment locations…">
-                <option value="wms1">WMS 1</option>
-                <option value="wms2">WMS 2</option>
+        <div className="mb-6">
+          <h2 className="text-[13.5px] font-semibold text-gray-900">Default Warehouse Locations</h2>
+          <p className="text-[11px] text-gray-500 mt-1.5">Set fallback warehouse locations for Order Aggregation and Order Routing when no specific rules apply.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Order Aggregation Default */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-5">
+            <div className="mb-4">
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+                <div className="flex-1">
+                  <div className="text-[13.5px] font-semibold text-gray-900">Order Aggregation</div>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">Used when aggregating orders from multiple channels into batches</p>
+                </div>
+              </div>
+            </div>
+            <Field label="Default Warehouse" hint="Fallback when no aggregation rule matches">
+              <Select value={defaultLoc} onChange={setDefaultLoc} placeholder="Select warehouse…">
+                <option value="">— Not set —</option>
+                <option value="wms1">WMS 1 - Mumbai Distribution Center</option>
+                <option value="wms2">WMS 2 - Delhi Fulfillment Hub</option>
               </Select>
             </Field>
             {defaultLoc && (
-              <button onClick={() => setDefaultLoc('')} className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors">
+              <button onClick={() => setDefaultLoc('')} className="mt-3 text-[11px] text-gray-400 hover:text-red-500 transition-colors font-medium">
                 ✕ Clear selection
               </button>
             )}
           </div>
-        </Card>
+
+          {/* Order Routing Default */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-5">
+            <div className="mb-4">
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+                <div className="flex-1">
+                  <div className="text-[13.5px] font-semibold text-gray-900">Order Routing</div>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">Used when routing orders to fulfillment locations</p>
+                </div>
+              </div>
+            </div>
+            <Field label="Default Warehouse" hint="Fallback when no routing rule matches">
+              <Select value={defaultLoc} onChange={setDefaultLoc} placeholder="Select warehouse…">
+                <option value="">— Not set —</option>
+                <option value="wms1">WMS 1 - Mumbai Distribution Center</option>
+                <option value="wms2">WMS 2 - Delhi Fulfillment Hub</option>
+              </Select>
+            </Field>
+            {defaultLoc && (
+              <button onClick={() => setDefaultLoc('')} className="mt-3 text-[11px] text-gray-400 hover:text-red-500 transition-colors font-medium">
+                ✕ Clear selection
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Info box */}
+        <div className="mt-5 flex items-start gap-2.5 px-3.5 py-2.5 rounded-lg bg-sky-50 border border-sky-200 text-[11px] leading-relaxed text-sky-800">
+          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <span>When no specific rule matches an order, it automatically uses the default warehouse location. If not set, orders will be held for manual review.</span>
+        </div>
       </div>
 
       {/* Split Configuration */}
