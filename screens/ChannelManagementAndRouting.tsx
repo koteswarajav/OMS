@@ -224,7 +224,7 @@ function AggregationAndRoutingTab() {
           <div className="border-t border-gray-100 pt-4">
             <div className="text-[13.5px] font-semibold text-gray-900 mb-3">Default Warehouse</div>
             <Field label="Select default warehouse for Order Aggregation" hint="Used when no aggregation rule matches">
-              <Select value={defaultAggLoc} onChange={(e) => setDefaultAggLoc(e.target.value)}>
+              <Select value={defaultAggLoc} onChange={setDefaultAggLoc}>
                 <option value="">— Not set —</option>
                 <option value="wms1">WMS 1 - Mumbai Distribution Center</option>
                 <option value="wms2">WMS 2 - Delhi Fulfillment Hub</option>
@@ -254,7 +254,7 @@ function AggregationAndRoutingTab() {
           <div>
             <div className="text-[13.5px] font-semibold text-gray-900 mb-3">Default Warehouse</div>
             <Field label="Select default warehouse for Order Routing" hint="Fallback location when no routing rule matches">
-              <Select value={defaultRteLoc} onChange={(e) => setDefaultRteLoc(e.target.value)}>
+              <Select value={defaultRteLoc} onChange={setDefaultRteLoc}>
                 <option value="">— Not set —</option>
                 <option value="wms1">WMS 1 - Mumbai Distribution Center</option>
                 <option value="wms2">WMS 2 - Delhi Fulfillment Hub</option>
