@@ -300,11 +300,12 @@ function AggregationTab() {
   })()
 
   return (
-    <div className="flex flex-col gap-3.5">
-      <SectionCard
-        title="Aggregation Order ID Configuration"
-        description="Define how aggregated order IDs are generated (prefix, length, and sequence)."
-      >
+    <div className="flex flex-col gap-4">
+      {/* Card title + fields sit directly inside the outer tab card — no nesting */}
+      <div>
+        <div className="text-[13.5px] font-semibold text-gray-900 mb-0.5">Aggregation Order ID Configuration</div>
+        <div className="text-[11px] text-gray-400 mb-4">Define how aggregated order IDs are generated (prefix, length, and sequence).</div>
+
         <div className="grid grid-cols-2 gap-4">
           <Field label="Prefix" hint="Optional string prefix for aggregated order IDs.">
             <input className={inputCls} placeholder="e.g. BATCH" value={form.prefix} onChange={e => set('prefix')(e.target.value)} />
@@ -323,7 +324,7 @@ function AggregationTab() {
         {/* Preview */}
         <div className="mt-4 pt-4 border-t border-gray-100">
           <Field label="Preview">
-            <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[12.5px] font-semibold text-gray-900 bg-gray-50">
+            <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[12.5px] font-semibold text-blue-700 bg-blue-50 tracking-wide">
               {preview}
             </div>
           </Field>
@@ -332,7 +333,7 @@ function AggregationTab() {
             (e.g. 6 digits → max 999999). Low availability alerts are triggered when 90% of the ID range is used.
           </p>
         </div>
-      </SectionCard>
+      </div>
 
       <Alert>
         Note: Orders included in aggregation do not go through routing. Individual orders may still be routed according to routing rules.
@@ -349,38 +350,34 @@ function RoutingTab() {
   const [allowSplit, setAllowSplit]            = useState(false)
 
   return (
-    <div className="flex flex-col gap-3.5">
-      {/* Card 1: Default Fulfillment Location */}
-      <SectionCard
-        title="Default Fulfillment Location Configuration"
-        description="Define a default fulfillment location for routing when no other routing rule applies."
-      >
+    <div className="flex flex-col gap-6">
+      {/* Section: Default Fulfillment Location */}
+      <div>
+        <div className="text-[13.5px] font-semibold text-gray-900 mb-0.5">Default Fulfillment Location Configuration</div>
+        <div className="text-[11px] text-gray-400 mb-4">Define a default fulfillment location for routing when no other routing rule applies.</div>
         <Field
           label="Default Fulfillment Location (optional)"
           hint="If not set, orders will be routed based on routing rules only."
         >
-          <div className="relative">
-            <SelectField value={defaultLocation} onChange={setDefaultLocation} placeholder="Search fulfillment locations">
-              <option value="wms1">WMS 1</option>
-              <option value="wms2">WMS 2</option>
-            </SelectField>
-          </div>
+          <SelectField value={defaultLocation} onChange={setDefaultLocation} placeholder="Search fulfillment locations">
+            <option value="wms1">WMS 1</option>
+            <option value="wms2">WMS 2</option>
+          </SelectField>
         </Field>
         {defaultLocation && (
-          <button
-            onClick={() => setDefaultLocation('')}
-            className="mt-2 text-[11px] text-gray-400 hover:text-red-500 transition-colors"
-          >
+          <button onClick={() => setDefaultLocation('')} className="mt-2 text-[11px] text-gray-400 hover:text-red-500 transition-colors">
             ✕ Clear selection
           </button>
         )}
-      </SectionCard>
+      </div>
 
-      {/* Card 2: Split Configuration */}
-      <SectionCard
-        title="Split Configuration"
-        description="Control whether orders and individual line items can be routed to multiple fulfillment locations."
-      >
+      <div className="border-t border-gray-100" />
+
+      {/* Section: Split Configuration */}
+      <div>
+        <div className="text-[13.5px] font-semibold text-gray-900 mb-0.5">Split Configuration</div>
+        <div className="text-[11px] text-gray-400 mb-4">Control whether orders and individual line items can be routed to multiple fulfillment locations.</div>
+
         <div className="flex flex-col gap-5">
           {/* Toggle A */}
           <div className="flex items-start justify-between gap-4">
@@ -415,7 +412,7 @@ function RoutingTab() {
             <Toggle on={allowSplit} onToggle={() => setAllowSplit(v => !v)} disabled={!allowMulti} />
           </div>
         </div>
-      </SectionCard>
+      </div>
     </div>
   )
 }
@@ -471,6 +468,14 @@ export default function ChannelManagementAndRouting() {
             </div>
             <div className="p-5">
               {activeTab === 'aggregation' ? <AggregationTab /> : <RoutingTab />}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-gray-100 bg-gray-50">
+              <button className="inline-flex items-center justify-center gap-1.5 px-4 h-8 rounded-lg bg-white text-gray-700 text-[12.5px] font-semibold border border-gray-300 hover:bg-gray-50 transition-all">
+                Cancel
+              </button>
+              <button className="inline-flex items-center justify-center gap-1.5 px-4 h-8 rounded-lg bg-blue-600 text-white text-[12.5px] font-semibold hover:bg-blue-700 transition-all">
+                Save changes
+              </button>
             </div>
           </div>
         </div>
