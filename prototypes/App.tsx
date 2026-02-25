@@ -3,6 +3,7 @@ import FlowRunner from '../flows/FlowRunner'
 import { TemplateFlow } from '../flows/_template-flow'
 import { tokens } from '../design-system/tokens'
 import FulfillmentLocation from '../screens/FulfillmentLocation'
+import ChannelManagementAndRouting from '../screens/ChannelManagementAndRouting'
 
 // REGISTER NEW FLOWS HERE:
 // import { CheckoutFlow } from '../flows/CheckoutFlow'
@@ -15,7 +16,8 @@ const flows = [
 ]
 
 const screens = [
-  { path: '/fulfillment-location', name: 'Fulfillment Location', component: FulfillmentLocation },
+  { path: '/fulfillment-location',   name: 'Fulfillment Location',              component: FulfillmentLocation },
+  { path: '/channel-management',     name: 'Channel Management & Routing',      component: ChannelManagementAndRouting },
 ]
 
 function Index() {
