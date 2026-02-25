@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { AppShell } from '../design-system/components'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -19,6 +19,12 @@ interface Channel {
   routingEnabled: number
   aggregationEnabled: number
   connections: Connection[]
+}
+
+// Global defaults — what every connection inherits unless overridden
+const GLOBAL_DEFAULTS = {
+  routing:     { location: 'WMS 1' },
+  aggregation: { location: 'WMS 1', customer: '' },
 }
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
@@ -49,7 +55,7 @@ const channels: Channel[] = [
   },
 ]
 
-// ─── Inline Components ────────────────────────────────────────────────────────
+// ─── Shared UI Primitives ─────────────────────────────────────────────────────
 
 function Toggle({ on, onToggle, disabled = false }: { on: boolean; onToggle: () => void; disabled?: boolean }) {
   return (
@@ -119,63 +125,262 @@ function SelectField({ children, value, onChange, placeholder }: {
   )
 }
 
-// ─── Override Sub-Panel ───────────────────────────────────────────────────────
+// ─── Override Cell ────────────────────────────────────────────────────────────
+// Shows effective value inline. Muted + "↑ Global" when inheriting.
+// Blue + "Custom" badge + pencil when overridden. Click opens edit popover.
 
-function OverridePanel({ connId: _connId }: { connId: string }) {
-  const [tab, setTab] = useState<'routing' | 'aggregation'>('routing')
-  const [defaultLocation, setDefaultLocation] = useState('')
-  const [defaultCustomer, setDefaultCustomer] = useState('')
-  const [aggLocation, setAggLocation]         = useState('')
+interface RoutingOverride  { location: string }
+interface AggregationOverride { location: string; customer: string }
 
-  const tabCls = (t: string) =>
-    `px-4 py-2 text-xs font-semibold border-b-2 transition-colors ${
-      tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-    }`
+function RoutingCell({
+  override, onSave, onReset,
+}: {
+  override: RoutingOverride | null
+  onSave: (v: RoutingOverride) => void
+  onReset: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<RoutingOverride>({ location: '' })
+  const ref = useRef<HTMLDivElement>(null)
+
+  const isCustom = override !== null
+  const effectiveLocation = isCustom ? override.location : GLOBAL_DEFAULTS.routing.location
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const handleOpen = () => {
+    setDraft({ location: isCustom ? override!.location : GLOBAL_DEFAULTS.routing.location })
+    setOpen(true)
+  }
 
   return (
-    <div className="mt-3 border border-blue-100 rounded-xl overflow-hidden">
-      <div className="flex border-b border-blue-100 bg-blue-50/40">
-        <button className={tabCls('routing')}     onClick={() => setTab('routing')}>Order Routing</button>
-        <button className={tabCls('aggregation')} onClick={() => setTab('aggregation')}>Order Aggregation</button>
-      </div>
-      <div className="p-4 bg-white flex flex-col gap-4">
-        {tab === 'routing' && (
-          <Field label="Default Fulfillment Location" hint="Overrides the global OMS setting for routing on this connection.">
-            <SelectField value={defaultLocation} onChange={setDefaultLocation} placeholder="Use global default">
-              <option value="wms1">WMS 1</option>
-              <option value="wms2">WMS 2</option>
+    <div className="relative" ref={ref}>
+      {/* Cell trigger */}
+      <button
+        onClick={handleOpen}
+        className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors text-left w-full
+          ${isCustom
+            ? 'border-blue-200 bg-blue-50 hover:border-blue-300'
+            : 'border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50'}`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className={`text-xs font-semibold truncate ${isCustom ? 'text-blue-700' : 'text-gray-500'}`}>
+            {effectiveLocation}
+          </div>
+          <div className="flex items-center gap-1 mt-0.5">
+            {isCustom ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Custom
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+                Global
+              </span>
+            )}
+          </div>
+        </div>
+        <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-opacity ${isCustom ? 'text-blue-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </button>
+
+      {/* Edit popover */}
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 z-30 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Routing Override</span>
+            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Global reference */}
+          <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Global default</div>
+            <div className="text-xs font-semibold text-gray-600">{GLOBAL_DEFAULTS.routing.location}</div>
+          </div>
+
+          <Field label="Fulfillment Location" hint="Override for this connection only.">
+            <SelectField value={draft.location} onChange={v => setDraft({ location: v })}>
+              <option value="WMS 1">WMS 1</option>
+              <option value="WMS 2">WMS 2</option>
             </SelectField>
           </Field>
-        )}
-        {tab === 'aggregation' && (
-          <>
-            <Field label="Default Customer" hint="Search by Customer ID, Name, Phone, or Email.">
-              <input className={inputCls} placeholder="Search customers…" value={defaultCustomer} onChange={e => setDefaultCustomer(e.target.value)} />
-            </Field>
-            <Field label="Default Fulfillment Location" hint="Used as default for aggregation on this connection.">
-              <SelectField value={aggLocation} onChange={setAggLocation} placeholder="Search fulfillment locations">
-                <option value="wms1">WMS 1</option>
-                <option value="wms2">WMS 2</option>
-              </SelectField>
-            </Field>
-          </>
-        )}
-      </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+            {isCustom ? (
+              <button onClick={() => { onReset(); setOpen(false) }}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium">
+                Reset to global
+              </button>
+            ) : <span />}
+            <button
+              onClick={() => { onSave(draft); setOpen(false) }}
+              className="px-3 h-7 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── Connection Row ───────────────────────────────────────────────────────────
+function AggregationCell({
+  override, onSave, onReset,
+}: {
+  override: AggregationOverride | null
+  onSave: (v: AggregationOverride) => void
+  onReset: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<AggregationOverride>({ location: '', customer: '' })
+  const ref = useRef<HTMLDivElement>(null)
+
+  const isCustom = override !== null
+  const effectiveLocation = isCustom ? override.location : GLOBAL_DEFAULTS.aggregation.location
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const handleOpen = () => {
+    setDraft(isCustom ? { ...override! } : { location: GLOBAL_DEFAULTS.aggregation.location, customer: '' })
+    setOpen(true)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      {/* Cell trigger */}
+      <button
+        onClick={handleOpen}
+        className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors text-left w-full
+          ${isCustom
+            ? 'border-blue-200 bg-blue-50 hover:border-blue-300'
+            : 'border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50'}`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className={`text-xs font-semibold truncate ${isCustom ? 'text-blue-700' : 'text-gray-500'}`}>
+            {effectiveLocation}
+          </div>
+          <div className="flex items-center gap-1 mt-0.5">
+            {isCustom ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Custom
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+                Global
+              </span>
+            )}
+          </div>
+        </div>
+        <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-opacity ${isCustom ? 'text-blue-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </button>
+
+      {/* Edit popover */}
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 z-30 w-72 bg-white border border-gray-200 rounded-xl shadow-lg p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Aggregation Override</span>
+            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Global reference */}
+          <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Global default</div>
+            <div className="text-xs font-semibold text-gray-600">{GLOBAL_DEFAULTS.aggregation.location}</div>
+          </div>
+
+          <Field label="Fulfillment Location" hint="Override for this connection only.">
+            <SelectField value={draft.location} onChange={v => setDraft(d => ({ ...d, location: v }))}>
+              <option value="WMS 1">WMS 1</option>
+              <option value="WMS 2">WMS 2</option>
+            </SelectField>
+          </Field>
+
+          <Field label="Default Customer" hint="Search by ID, Name, Phone, or Email.">
+            <input
+              className={inputCls}
+              placeholder="Search customers…"
+              value={draft.customer}
+              onChange={e => setDraft(d => ({ ...d, customer: e.target.value }))}
+            />
+          </Field>
+
+          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+            {isCustom ? (
+              <button onClick={() => { onReset(); setOpen(false) }}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium">
+                Reset to global
+              </button>
+            ) : <span />}
+            <button
+              onClick={() => { onSave(draft); setOpen(false) }}
+              className="px-3 h-7 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Connection Row — Inheritance Model ───────────────────────────────────────
 
 function ConnectionRow({ conn }: { conn: Connection }) {
   const [aggregation, setAggregation] = useState(true)
   const [routing, setRouting]         = useState(true)
-  const [overrides, setOverrides]     = useState(false)
+
+  // null = inheriting global, non-null = custom override set
+  const [routingOverride, setRoutingOverride]         = useState<RoutingOverride | null>(null)
+  const [aggregationOverride, setAggregationOverride] = useState<AggregationOverride | null>(null)
+
+  const hasAnyOverride = routingOverride !== null || aggregationOverride !== null
 
   return (
-    <div className={`border rounded-xl bg-white transition-all ${overrides ? 'border-blue-200 shadow-sm' : 'border-gray-200'}`}>
-      {/* Main row */}
+    <div className={`border rounded-xl bg-white transition-all ${hasAnyOverride ? 'border-blue-200' : 'border-gray-200'}`}>
       <div className="flex items-center gap-3 px-4 py-3.5">
+
+        {/* Connection name */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-gray-900">{conn.name}</span>
@@ -187,36 +392,49 @@ function ConnectionRow({ conn }: { conn: Connection }) {
               </svg>
             </a>
           </div>
+          {hasAnyOverride && (
+            <div className="flex items-center gap-1 mt-1">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Has overrides
+              </span>
+            </div>
+          )}
         </div>
-        {/* Toggles aligned to match column headers */}
-        <div className="flex items-center gap-5 flex-shrink-0 pr-1">
-          <div className="w-[90px] flex items-center justify-center gap-2">
+
+        {/* Aggregation toggle + override cell */}
+        <div className="w-[130px] flex flex-col gap-1.5 items-center">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">{aggregation ? 'On' : 'Off'}</span>
             <Toggle on={aggregation} onToggle={() => setAggregation(v => !v)} />
           </div>
-          <div className="w-[80px] flex items-center justify-center gap-2">
+          {aggregation && (
+            <AggregationCell
+              override={aggregationOverride}
+              onSave={setAggregationOverride}
+              onReset={() => setAggregationOverride(null)}
+            />
+          )}
+        </div>
+
+        {/* Routing toggle + override cell */}
+        <div className="w-[120px] flex flex-col gap-1.5 items-center">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">{routing ? 'On' : 'Off'}</span>
             <Toggle on={routing} onToggle={() => setRouting(v => !v)} />
           </div>
+          {routing && (
+            <RoutingCell
+              override={routingOverride}
+              onSave={setRoutingOverride}
+              onReset={() => setRoutingOverride(null)}
+            />
+          )}
         </div>
-      </div>
 
-      {/* Channel Overrides */}
-      <div className={`px-4 py-3 border-t flex items-center justify-between transition-colors ${overrides ? 'border-blue-100 bg-blue-50/30' : 'border-gray-100 bg-gray-50/50'}`}>
-        <div>
-          <span className="text-xs font-semibold text-gray-700">Channel Overrides</span>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {overrides ? 'Connection-specific defaults applied.' : 'Using global OMS settings.'}
-          </p>
-        </div>
-        <Toggle on={overrides} onToggle={() => setOverrides(v => !v)} />
       </div>
-
-      {overrides && (
-        <div className="px-4 pb-4 bg-white">
-          <OverridePanel connId={conn.id} />
-        </div>
-      )}
     </div>
   )
 }
@@ -227,12 +445,11 @@ function ChannelAccordion({ channel }: { channel: Channel }) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className={`bg-white border rounded-xl shadow-sm overflow-hidden transition-all ${open ? 'border-blue-200' : 'border-gray-200 hover:border-gray-300'}`}>
+    <div className={`bg-white border rounded-xl shadow-sm overflow-visible transition-all ${open ? 'border-blue-200' : 'border-gray-200 hover:border-gray-300'}`}>
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/70 transition-colors text-left"
       >
-        {/* Channel initials */}
         <div className={`w-9 h-9 rounded-full ${channel.color} text-white text-xs font-bold flex items-center justify-center flex-shrink-0`}>
           {channel.initials}
         </div>
@@ -248,14 +465,13 @@ function ChannelAccordion({ channel }: { channel: Channel }) {
           </div>
         </div>
 
-        {/* Column-aligned status badges */}
         <div className="flex items-center gap-5 flex-shrink-0 pr-1">
-          <div className="w-[90px] flex justify-center">
+          <div className="w-[130px] flex justify-center">
             <Badge variant={channel.aggregationEnabled > 0 ? 'success' : 'neutral'}>
               {channel.aggregationEnabled}/{channel.subscriptions}
             </Badge>
           </div>
-          <div className="w-[80px] flex justify-center">
+          <div className="w-[120px] flex justify-center">
             <Badge variant={channel.routingEnabled > 0 ? 'primary' : 'neutral'}>
               {channel.routingEnabled}/{channel.subscriptions}
             </Badge>
@@ -271,7 +487,16 @@ function ChannelAccordion({ channel }: { channel: Channel }) {
       </button>
 
       {open && (
-        <div className="border-t border-gray-100 px-5 py-4 flex flex-col gap-3 bg-gray-50/40">
+        <div className="border-t border-gray-100 px-5 py-4 flex flex-col gap-2 bg-gray-50/40">
+          {/* Connection-level column sub-headers */}
+          <div className="flex items-center px-4 pb-1">
+            <div className="flex-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Connection</div>
+            <div className="flex gap-0 pr-1">
+              <div className="w-[130px] text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aggregation</div>
+              <div className="w-[120px] text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Routing</div>
+            </div>
+            <div className="w-4" />
+          </div>
           {channel.connections.map(conn => (
             <ConnectionRow key={conn.id} conn={conn} />
           ))}
@@ -444,20 +669,29 @@ export default function ChannelManagementAndRouting() {
 
         <div className="flex flex-col gap-8">
 
-          {/* ── Section 1: Channel Management ── */}
+          {/* ── Section 1: Channels ── */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Channels</h2>
+              {/* Global defaults pill — scannable reference */}
+              <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Global defaults:
+                <span className="font-semibold text-gray-600">WMS 1</span>
+                for both routing &amp; aggregation
+              </div>
             </div>
 
-            {/* Column headers */}
+            {/* Column headers — aligned to connection row columns */}
             <div className="flex items-center px-5 pb-2.5">
               <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Channel</div>
-              <div className="flex gap-5 pr-8">
-                <div className="w-[90px] text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Aggregation</div>
-                <div className="w-[80px] text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Routing</div>
+              <div className="flex gap-0 pr-8">
+                <div className="w-[130px] text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Aggregation</div>
+                <div className="w-[120px] text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Routing</div>
               </div>
-              <div className="w-4" /> {/* chevron spacer */}
+              <div className="w-4" />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -474,7 +708,6 @@ export default function ChannelManagementAndRouting() {
             </h2>
 
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-              {/* Tab bar */}
               <div className="flex border-b border-gray-200 bg-gray-50/60 px-2">
                 <button className={tabCls('aggregation')} onClick={() => setActiveTab('aggregation')}>
                   Order Aggregation
@@ -484,12 +717,10 @@ export default function ChannelManagementAndRouting() {
                 </button>
               </div>
 
-              {/* Tab content */}
               <div className="px-7 py-7">
                 {activeTab === 'aggregation' ? <AggregationTab /> : <RoutingTab />}
               </div>
 
-              {/* Footer */}
               <div className="flex justify-end items-center gap-3 px-7 py-4 border-t border-gray-100 bg-gray-50/60">
                 <button className="inline-flex items-center justify-center px-5 h-9 rounded-lg bg-white text-gray-700 text-sm font-semibold border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors">
                   Cancel
