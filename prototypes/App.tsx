@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import FlowRunner from '../flows/FlowRunner'
 import { TemplateFlow } from '../flows/_template-flow'
 import { tokens } from '../design-system/tokens'
+import FulfillmentLocation from '../screens/FulfillmentLocation'
 
 // REGISTER NEW FLOWS HERE:
 // import { CheckoutFlow } from '../flows/CheckoutFlow'
@@ -11,6 +12,10 @@ const flows = [
   { path: '/template', name: 'Template Flow', flow: TemplateFlow },
   // { path: '/checkout', name: 'Checkout Flow', flow: CheckoutFlow },
   // { path: '/onboarding', name: 'Onboarding Flow', flow: OnboardingFlow },
+]
+
+const screens = [
+  { path: '/fulfillment-location', name: 'Fulfillment Location', component: FulfillmentLocation },
 ]
 
 function Index() {
@@ -29,10 +34,10 @@ function Index() {
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.space.sm }}>
-        {flows.map(f => (
+        {[...flows.map(f => ({ path: f.path, name: f.name })), ...screens.map(s => ({ path: s.path, name: s.name }))].map(item => (
           <Link
-            key={f.path}
-            to={f.path}
+            key={item.path}
+            to={item.path}
             style={{
               display: 'block',
               padding: `${tokens.space.md}px`,
@@ -46,7 +51,7 @@ function Index() {
               boxShadow: tokens.shadow.sm,
             }}
           >
-            → {f.name}
+            → {item.name}
           </Link>
         ))}
       </div>
@@ -64,6 +69,13 @@ export default function App() {
             key={f.path}
             path={f.path}
             element={<FlowRunner flow={f.flow} name={f.name} />}
+          />
+        ))}
+        {screens.map(s => (
+          <Route
+            key={s.path}
+            path={s.path}
+            element={<s.component />}
           />
         ))}
       </Routes>
