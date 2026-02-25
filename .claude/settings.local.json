@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\KoteswaraJavvali\\\\WorkFolder\\\\code\")",
+      "Bash(echo:*)"
+    ]
+  }
+}
