@@ -6,4 +6,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  server: {
+    hmr: {
+      overlay: false,
+    },
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
 })

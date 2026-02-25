@@ -1,13 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    './index.html',
-    './screens/**/*.{ts,tsx}',
-    './variants/**/*.{ts,tsx}',
-    './flows/**/*.{ts,tsx}',
-    './prototypes/**/*.{ts,tsx}',
-    './design-system/**/*.{ts,tsx}',
-  ],
   theme: {
     extend: {
       fontFamily: {
@@ -22,5 +14,4 @@ export default {
       },
     },
   },
-  plugins: [],
 }
