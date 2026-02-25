@@ -1,92 +1,106 @@
 import { useState, useRef, useEffect } from 'react'
-import { AppShell } from '../design-system/components'
+import { AppShell, Button, Card, Input, Toggle, Badge, Field, Select } from '../design-system/components'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types & Data ─────────────────────────────────────────────────────────────
 
 interface Connection {
-  id: string
-  name: string
-  app: string
-  isCustom: boolean
+  id: string; name: string; app: string; isCustom?: boolean
 }
-
 interface Channel {
-  id: string
-  name: string
-  initials: string
-  color: string
-  subscriptions: number
-  routingEnabled: number
-  aggregationEnabled: number
+  id: string; name: string; initials: string; color: string
   connections: Connection[]
+  routingOn: number; aggregationOn: number
+}
+interface RoutingOverride     { location: string }
+interface AggregationOverride { location: string; customer: string }
+interface RoutingRule {
+  id: string; priority: number
+  condField: string; condOp: string; condValue: string
+  action: string
 }
 
-// Global defaults — what every connection inherits unless overridden
-const GLOBAL_DEFAULTS = {
-  routing:     { location: 'WMS 1' },
-  aggregation: { location: 'WMS 1', customer: '' },
-}
+const GLOBAL = { routing: { location: 'WMS 1' }, aggregation: { location: 'WMS 1' } }
 
-// ─── Sample Data ─────────────────────────────────────────────────────────────
-
-const channels: Channel[] = [
-  {
-    id: 'shopify', name: 'Shopify', initials: 'SH', color: 'bg-emerald-500',
-    subscriptions: 4, routingEnabled: 3, aggregationEnabled: 2,
+const CHANNELS: Channel[] = [
+  { id: 'sh', name: 'Shopify',       initials: 'SH', color: '#10B981',
+    routingOn: 3, aggregationOn: 2,
     connections: [
-      { id: 'c1', name: 'Shopify Store US', app: 'Shopify App', isCustom: false },
-      { id: 'c2', name: 'Shopify Store IN', app: 'Shopify App', isCustom: true },
-    ],
-  },
-  {
-    id: 'bc', name: 'BigCommerce', initials: 'BC', color: 'bg-violet-500',
-    subscriptions: 2, routingEnabled: 1, aggregationEnabled: 1,
+      { id: 'c1', name: 'Shopify US',    app: 'Shopify App' },
+      { id: 'c2', name: 'Shopify India', app: 'Shopify App', isCustom: true },
+    ]},
+  { id: 'bc', name: 'BigCommerce',   initials: 'BC', color: '#7C3AED',
+    routingOn: 1, aggregationOn: 1,
     connections: [
-      { id: 'c3', name: 'BC Store Global', app: 'BigCommerce App', isCustom: false },
-    ],
-  },
-  {
-    id: 'woo', name: 'WooCommerce', initials: 'WC', color: 'bg-blue-500',
-    subscriptions: 3, routingEnabled: 2, aggregationEnabled: 2,
+      { id: 'c3', name: 'BC Global', app: 'BigCommerce App' },
+    ]},
+  { id: 'woo', name: 'WooCommerce', initials: 'WC', color: '#2B4FFF',
+    routingOn: 2, aggregationOn: 2,
     connections: [
-      { id: 'c4', name: 'WooCommerce Store EU', app: 'WooCommerce App', isCustom: false },
-      { id: 'c5', name: 'WooCommerce Store UK', app: 'WooCommerce App', isCustom: false },
-    ],
-  },
+      { id: 'c4', name: 'WooCommerce EU', app: 'WooCommerce App' },
+      { id: 'c5', name: 'WooCommerce UK', app: 'WooCommerce App' },
+    ]},
 ]
 
-// ─── Shared UI Primitives ─────────────────────────────────────────────────────
+const DEFAULT_RULES: RoutingRule[] = [
+  { id: 'r1', priority: 1, condField: 'country',  condOp: 'equals',      condValue: 'US', action: 'WMS 1' },
+  { id: 'r2', priority: 2, condField: 'country',  condOp: 'equals',      condValue: 'IN', action: 'WMS 2' },
+  { id: 'r3', priority: 3, condField: 'tag',      condOp: 'contains',    condValue: 'priority', action: 'WMS 1' },
+]
 
-function Toggle({ on, onToggle, disabled = false }: { on: boolean; onToggle: () => void; disabled?: boolean }) {
+// ─── Shared Micro-Components ──────────────────────────────────────────────────
+
+function IcoChevron({ dir = 'down' }: { dir?: 'up' | 'down' | 'right' }) {
+  const r = dir === 'up' ? 'rotate-180' : dir === 'right' ? '-rotate-90' : ''
   return (
-    <button
-      onClick={disabled ? undefined : onToggle}
-      title={disabled ? 'Enable "Allow multiple fulfillment locations for an order" first.' : undefined}
-      className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500
-        ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-        ${on ? 'bg-blue-600' : 'bg-gray-300'}`}
-    >
-      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${on ? 'translate-x-4' : 'translate-x-0'}`} />
-    </button>
+    <svg className={`w-4 h-4 ${r}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  )
+}
+function IcoPencil() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.36-6.36a2.5 2.5 0 013.536 3.536L12.5 14.5H9v-3.5z" />
+    </svg>
+  )
+}
+function IcoTrash() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  )
+}
+function IcoGrip() {
+  return (
+    <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="9" cy="7" r="1.5" /><circle cx="15" cy="7" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="17" r="1.5" /><circle cx="15" cy="17" r="1.5" />
+    </svg>
+  )
+}
+function IcoInfo() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
   )
 }
 
-function Badge({ children, variant = 'neutral' }: { children: React.ReactNode; variant?: 'primary' | 'success' | 'warning' | 'neutral' | 'info' | 'brand' }) {
-  const cls = {
-    primary: 'bg-blue-50 text-blue-700 border border-blue-100',
-    brand:   'bg-blue-50 text-blue-600 border border-blue-100',
-    success: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-    warning: 'bg-amber-50 text-amber-700 border border-amber-100',
-    neutral: 'bg-gray-100 text-gray-600 border border-gray-200',
-    info:    'bg-sky-50 text-sky-700 border border-sky-100',
-  }[variant]
-  return <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{children}</span>
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="mb-5">
+      <h2 className="text-sm font-bold text-gray-900">{title}</h2>
+      {subtitle && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{subtitle}</p>}
+    </div>
+  )
 }
 
-function Alert({ children }: { children: React.ReactNode }) {
+function InfoBanner({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg border bg-sky-50 border-sky-200 text-sky-800 text-xs leading-5">
-      <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+      <svg className="w-4 h-4 mt-0.5 flex-shrink-0 text-sky-500" fill="currentColor" viewBox="0 0 20 20">
         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
       </svg>
       <span>{children}</span>
@@ -94,346 +108,191 @@ function Alert({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold text-gray-500 tracking-wide uppercase">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-gray-400 leading-relaxed">{hint}</p>}
-    </div>
-  )
-}
+// ─── Override Popover Cell ────────────────────────────────────────────────────
 
-const selectCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 font-medium bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors hover:border-gray-300 pr-8"
-const inputCls  = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors placeholder:text-gray-300 hover:border-gray-300"
-
-function SelectField({ children, value, onChange, placeholder }: {
-  children: React.ReactNode; value: string; onChange: (v: string) => void; placeholder?: string
+function OverridePopover({
+  open, onClose, title, globalDefault, children, onApply, onReset, hasCustom,
+}: {
+  open: boolean; onClose: () => void; title: string; globalDefault: string
+  children: React.ReactNode; onApply: () => void; onReset?: () => void; hasCustom: boolean
 }) {
+  if (!open) return null
   return (
-    <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)} className={selectCls}>
-        {placeholder && <option value="">{placeholder}</option>}
-        {children}
-      </select>
-      <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+    <div className="absolute top-full left-0 mt-1.5 z-50 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">{title}</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-0.5">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 flex items-center gap-2">
+        <div className="flex-1">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Global default</div>
+          <div className="text-xs font-semibold text-gray-700">{globalDefault}</div>
+        </div>
+      </div>
+      {children}
+      <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+        {hasCustom
+          ? <button onClick={onReset} className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium">Reset to global</button>
+          : <span />}
+        <button onClick={onApply}
+          className="px-4 h-7 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+          Apply
+        </button>
       </div>
     </div>
   )
 }
 
-// ─── Override Cell ────────────────────────────────────────────────────────────
-// Shows effective value inline. Muted + "↑ Global" when inheriting.
-// Blue + "Custom" badge + pencil when overridden. Click opens edit popover.
-
-interface RoutingOverride  { location: string }
-interface AggregationOverride { location: string; customer: string }
-
-function RoutingCell({
-  override, onSave, onReset,
-}: {
-  override: RoutingOverride | null
-  onSave: (v: RoutingOverride) => void
-  onReset: () => void
+function RoutingCell({ override, onSave, onReset }: {
+  override: RoutingOverride | null; onSave: (v: RoutingOverride) => void; onReset: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<RoutingOverride>({ location: '' })
+  const [draft, setDraft] = useState({ location: '' })
   const ref = useRef<HTMLDivElement>(null)
-
   const isCustom = override !== null
-  const effectiveLocation = isCustom ? override.location : GLOBAL_DEFAULTS.routing.location
+  const effective = isCustom ? override.location : GLOBAL.routing.location
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
   }, [open])
-
-  const handleOpen = () => {
-    setDraft({ location: isCustom ? override!.location : GLOBAL_DEFAULTS.routing.location })
-    setOpen(true)
-  }
 
   return (
     <div className="relative" ref={ref}>
-      {/* Cell trigger */}
       <button
-        onClick={handleOpen}
-        className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors text-left w-full
-          ${isCustom
-            ? 'border-blue-200 bg-blue-50 hover:border-blue-300'
-            : 'border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50'}`}
+        onClick={() => { setDraft({ location: effective }); setOpen(true) }}
+        className={`group flex items-center gap-2 px-2.5 py-1.5 rounded-lg border w-full text-left transition-all
+          ${isCustom ? 'border-blue-200 bg-blue-50 hover:border-blue-300' : 'border-transparent hover:border-gray-200 hover:bg-gray-50'}`}
       >
         <div className="flex-1 min-w-0">
-          <div className={`text-xs font-semibold truncate ${isCustom ? 'text-blue-700' : 'text-gray-500'}`}>
-            {effectiveLocation}
-          </div>
-          <div className="flex items-center gap-1 mt-0.5">
-            {isCustom ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Custom
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                </svg>
-                Global
-              </span>
-            )}
+          <div className={`text-xs font-semibold truncate ${isCustom ? 'text-blue-700' : 'text-gray-500'}`}>{effective}</div>
+          <div className={`text-[10px] mt-0.5 font-medium ${isCustom ? 'text-blue-400' : 'text-gray-400'}`}>
+            {isCustom ? '✦ Custom' : '↑ Global'}
           </div>
         </div>
-        <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-opacity ${isCustom ? 'text-blue-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-        </svg>
+        <span className={`transition-opacity flex-shrink-0 ${isCustom ? 'text-blue-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}>
+          <IcoPencil />
+        </span>
       </button>
-
-      {/* Edit popover */}
-      {open && (
-        <div className="absolute top-full left-0 mt-1.5 z-30 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Routing Override</span>
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Global reference */}
-          <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Global default</div>
-            <div className="text-xs font-semibold text-gray-600">{GLOBAL_DEFAULTS.routing.location}</div>
-          </div>
-
-          <Field label="Fulfillment Location" hint="Override for this connection only.">
-            <SelectField value={draft.location} onChange={v => setDraft({ location: v })}>
-              <option value="WMS 1">WMS 1</option>
-              <option value="WMS 2">WMS 2</option>
-            </SelectField>
-          </Field>
-
-          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-            {isCustom ? (
-              <button onClick={() => { onReset(); setOpen(false) }}
-                className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium">
-                Reset to global
-              </button>
-            ) : <span />}
-            <button
-              onClick={() => { onSave(draft); setOpen(false) }}
-              className="px-3 h-7 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
+      <OverridePopover
+        open={open} onClose={() => setOpen(false)} title="Routing Override"
+        globalDefault={GLOBAL.routing.location} hasCustom={isCustom}
+        onApply={() => { onSave(draft); setOpen(false) }}
+        onReset={() => { onReset(); setOpen(false) }}
+      >
+        <Field label="Fulfillment Location" hint="Override for this connection only.">
+          <Select value={draft.location} onChange={v => setDraft({ location: v })}>
+            <option value="WMS 1">WMS 1</option>
+            <option value="WMS 2">WMS 2</option>
+          </Select>
+        </Field>
+      </OverridePopover>
     </div>
   )
 }
 
-function AggregationCell({
-  override, onSave, onReset,
-}: {
-  override: AggregationOverride | null
-  onSave: (v: AggregationOverride) => void
-  onReset: () => void
+function AggregationCell({ override, onSave, onReset }: {
+  override: AggregationOverride | null; onSave: (v: AggregationOverride) => void; onReset: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<AggregationOverride>({ location: '', customer: '' })
+  const [draft, setDraft] = useState({ location: '', customer: '' })
   const ref = useRef<HTMLDivElement>(null)
-
   const isCustom = override !== null
-  const effectiveLocation = isCustom ? override.location : GLOBAL_DEFAULTS.aggregation.location
+  const effective = isCustom ? override.location : GLOBAL.aggregation.location
 
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
   }, [open])
-
-  const handleOpen = () => {
-    setDraft(isCustom ? { ...override! } : { location: GLOBAL_DEFAULTS.aggregation.location, customer: '' })
-    setOpen(true)
-  }
 
   return (
     <div className="relative" ref={ref}>
-      {/* Cell trigger */}
       <button
-        onClick={handleOpen}
-        className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors text-left w-full
-          ${isCustom
-            ? 'border-blue-200 bg-blue-50 hover:border-blue-300'
-            : 'border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50'}`}
+        onClick={() => { setDraft(isCustom ? { ...override! } : { location: GLOBAL.aggregation.location, customer: '' }); setOpen(true) }}
+        className={`group flex items-center gap-2 px-2.5 py-1.5 rounded-lg border w-full text-left transition-all
+          ${isCustom ? 'border-blue-200 bg-blue-50 hover:border-blue-300' : 'border-transparent hover:border-gray-200 hover:bg-gray-50'}`}
       >
         <div className="flex-1 min-w-0">
-          <div className={`text-xs font-semibold truncate ${isCustom ? 'text-blue-700' : 'text-gray-500'}`}>
-            {effectiveLocation}
-          </div>
-          <div className="flex items-center gap-1 mt-0.5">
-            {isCustom ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Custom
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                </svg>
-                Global
-              </span>
-            )}
+          <div className={`text-xs font-semibold truncate ${isCustom ? 'text-blue-700' : 'text-gray-500'}`}>{effective}</div>
+          <div className={`text-[10px] mt-0.5 font-medium ${isCustom ? 'text-blue-400' : 'text-gray-400'}`}>
+            {isCustom ? '✦ Custom' : '↑ Global'}
           </div>
         </div>
-        <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-opacity ${isCustom ? 'text-blue-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-        </svg>
+        <span className={`transition-opacity flex-shrink-0 ${isCustom ? 'text-blue-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}>
+          <IcoPencil />
+        </span>
       </button>
-
-      {/* Edit popover */}
-      {open && (
-        <div className="absolute top-full left-0 mt-1.5 z-30 w-72 bg-white border border-gray-200 rounded-xl shadow-lg p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Aggregation Override</span>
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Global reference */}
-          <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Global default</div>
-            <div className="text-xs font-semibold text-gray-600">{GLOBAL_DEFAULTS.aggregation.location}</div>
-          </div>
-
-          <Field label="Fulfillment Location" hint="Override for this connection only.">
-            <SelectField value={draft.location} onChange={v => setDraft(d => ({ ...d, location: v }))}>
-              <option value="WMS 1">WMS 1</option>
-              <option value="WMS 2">WMS 2</option>
-            </SelectField>
-          </Field>
-
-          <Field label="Default Customer" hint="Search by ID, Name, Phone, or Email.">
-            <input
-              className={inputCls}
-              placeholder="Search customers…"
-              value={draft.customer}
-              onChange={e => setDraft(d => ({ ...d, customer: e.target.value }))}
-            />
-          </Field>
-
-          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-            {isCustom ? (
-              <button onClick={() => { onReset(); setOpen(false) }}
-                className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium">
-                Reset to global
-              </button>
-            ) : <span />}
-            <button
-              onClick={() => { onSave(draft); setOpen(false) }}
-              className="px-3 h-7 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
+      <OverridePopover
+        open={open} onClose={() => setOpen(false)} title="Aggregation Override"
+        globalDefault={GLOBAL.aggregation.location} hasCustom={isCustom}
+        onApply={() => { onSave(draft); setOpen(false) }}
+        onReset={() => { onReset(); setOpen(false) }}
+      >
+        <Field label="Fulfillment Location" hint="Override for this connection only.">
+          <Select value={draft.location} onChange={v => setDraft(d => ({ ...d, location: v }))}>
+            <option value="WMS 1">WMS 1</option>
+            <option value="WMS 2">WMS 2</option>
+          </Select>
+        </Field>
+        <Field label="Default Customer" hint="Search by ID, Name, Phone, or Email.">
+          <Input
+            placeholder="Search customers…"
+            value={draft.customer}
+            onChange={v => setDraft(d => ({ ...d, customer: v }))}
+          />
+        </Field>
+      </OverridePopover>
     </div>
   )
 }
 
-// ─── Connection Row — Inheritance Model ───────────────────────────────────────
+// ─── Connection Row ───────────────────────────────────────────────────────────
 
 function ConnectionRow({ conn }: { conn: Connection }) {
-  const [aggregation, setAggregation] = useState(true)
-  const [routing, setRouting]         = useState(true)
-
-  // null = inheriting global, non-null = custom override set
-  const [routingOverride, setRoutingOverride]         = useState<RoutingOverride | null>(null)
-  const [aggregationOverride, setAggregationOverride] = useState<AggregationOverride | null>(null)
-
-  const hasAnyOverride = routingOverride !== null || aggregationOverride !== null
+  const [aggOn, setAggOn]   = useState(true)
+  const [rteOn, setRteOn]   = useState(true)
+  const [rOverride, setRO]  = useState<RoutingOverride | null>(null)
+  const [aOverride, setAO]  = useState<AggregationOverride | null>(null)
+  const hasOverride = rOverride !== null || aOverride !== null
 
   return (
-    <div className={`border rounded-xl bg-white transition-all ${hasAnyOverride ? 'border-blue-200' : 'border-gray-200'}`}>
-      <div className="flex items-center gap-3 px-4 py-3.5">
+    <div className={`flex items-center gap-4 px-5 py-3.5 border rounded-xl bg-white transition-all
+      ${hasOverride ? 'border-blue-200' : 'border-gray-100'}`}>
 
-        {/* Connection name */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-gray-900">{conn.name}</span>
-            <span className="text-xs text-gray-400">({conn.app})</span>
-            {conn.isCustom && <Badge variant="primary">Custom subscription</Badge>}
-            <a href="#" className="text-gray-300 hover:text-blue-500 transition-colors" title="Open connection">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
-          {hasAnyOverride && (
-            <div className="flex items-center gap-1 mt-1">
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">
-                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Has overrides
-              </span>
-            </div>
-          )}
+      {/* Connection info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold text-gray-900">{conn.name}</span>
+          <span className="text-xs text-gray-400">{conn.app}</span>
+          {conn.isCustom && <Badge variant="primary">Custom</Badge>}
+          {hasOverride && <Badge variant="brand">Has overrides</Badge>}
         </div>
+      </div>
 
-        {/* Aggregation toggle + override cell */}
-        <div className="w-[130px] flex flex-col gap-1.5 items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">{aggregation ? 'On' : 'Off'}</span>
-            <Toggle on={aggregation} onToggle={() => setAggregation(v => !v)} />
-          </div>
-          {aggregation && (
-            <AggregationCell
-              override={aggregationOverride}
-              onSave={setAggregationOverride}
-              onReset={() => setAggregationOverride(null)}
-            />
-          )}
+      {/* Aggregation column */}
+      <div className="w-[160px] flex flex-col items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">{aggOn ? 'On' : 'Off'}</span>
+          <Toggle on={aggOn} onToggle={() => setAggOn(v => !v)} />
         </div>
+        {aggOn && <AggregationCell override={aOverride} onSave={setAO} onReset={() => setAO(null)} />}
+      </div>
 
-        {/* Routing toggle + override cell */}
-        <div className="w-[120px] flex flex-col gap-1.5 items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">{routing ? 'On' : 'Off'}</span>
-            <Toggle on={routing} onToggle={() => setRouting(v => !v)} />
-          </div>
-          {routing && (
-            <RoutingCell
-              override={routingOverride}
-              onSave={setRoutingOverride}
-              onReset={() => setRoutingOverride(null)}
-            />
-          )}
+      {/* Routing column */}
+      <div className="w-[140px] flex flex-col items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">{rteOn ? 'On' : 'Off'}</span>
+          <Toggle on={rteOn} onToggle={() => setRteOn(v => !v)} />
         </div>
-
+        {rteOn && <RoutingCell override={rOverride} onSave={setRO} onReset={() => setRO(null)} />}
       </div>
     </div>
   )
@@ -441,298 +300,435 @@ function ConnectionRow({ conn }: { conn: Connection }) {
 
 // ─── Channel Accordion ────────────────────────────────────────────────────────
 
-function ChannelAccordion({ channel }: { channel: Channel }) {
+function ChannelRow({ ch }: { ch: Channel }) {
   const [open, setOpen] = useState(false)
-
   return (
-    <div className={`bg-white border rounded-xl shadow-sm overflow-visible transition-all ${open ? 'border-blue-200' : 'border-gray-200 hover:border-gray-300'}`}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/70 transition-colors text-left"
-      >
-        <div className={`w-9 h-9 rounded-full ${channel.color} text-white text-xs font-bold flex items-center justify-center flex-shrink-0`}>
-          {channel.initials}
+    <div className={`bg-white border rounded-xl shadow-sm overflow-visible ${open ? 'border-blue-200' : 'border-gray-200 hover:border-gray-300'} transition-all`}>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors text-left">
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+          style={{ background: ch.color }}>
+          {ch.initials}
         </div>
-
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-gray-900">{channel.name}</div>
-          <div className="flex items-center gap-3 mt-0.5">
-            <span className="text-xs text-gray-400">{channel.subscriptions} subscriptions</span>
-            <span className="text-gray-200">·</span>
-            <span className="text-xs text-gray-400">{channel.routingEnabled} routing</span>
-            <span className="text-gray-200">·</span>
-            <span className="text-xs text-gray-400">{channel.aggregationEnabled} aggregation</span>
-          </div>
+          <div className="text-sm font-semibold text-gray-900">{ch.name}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{ch.connections.length} connections</div>
         </div>
-
-        <div className="flex items-center gap-5 flex-shrink-0 pr-1">
-          <div className="w-[130px] flex justify-center">
-            <Badge variant={channel.aggregationEnabled > 0 ? 'success' : 'neutral'}>
-              {channel.aggregationEnabled}/{channel.subscriptions}
+        <div className="flex items-center gap-6 flex-shrink-0">
+          <div className="w-[160px] flex justify-center">
+            <Badge variant={ch.aggregationOn > 0 ? 'success' : 'neutral'}>
+              {ch.aggregationOn}/{ch.connections.length} aggregation
             </Badge>
           </div>
-          <div className="w-[120px] flex justify-center">
-            <Badge variant={channel.routingEnabled > 0 ? 'primary' : 'neutral'}>
-              {channel.routingEnabled}/{channel.subscriptions}
+          <div className="w-[140px] flex justify-center">
+            <Badge variant={ch.routingOn > 0 ? 'primary' : 'neutral'}>
+              {ch.routingOn}/{ch.connections.length} routing
             </Badge>
           </div>
         </div>
-
-        <svg
-          className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <span className={`text-gray-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+          <IcoChevron />
+        </span>
       </button>
 
       {open && (
         <div className="border-t border-gray-100 px-5 py-4 flex flex-col gap-2 bg-gray-50/40">
-          {/* Connection-level column sub-headers */}
-          <div className="flex items-center px-4 pb-1">
-            <div className="flex-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Connection</div>
-            <div className="flex gap-0 pr-1">
-              <div className="w-[130px] text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aggregation</div>
-              <div className="w-[120px] text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Routing</div>
-            </div>
-            <div className="w-4" />
+          <div className="flex items-center px-5 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+            <div className="flex-1">Connection</div>
+            <div className="w-[160px] text-center">Aggregation</div>
+            <div className="w-[140px] text-center">Routing</div>
           </div>
-          {channel.connections.map(conn => (
-            <ConnectionRow key={conn.id} conn={conn} />
-          ))}
+          {ch.connections.map(conn => <ConnectionRow key={conn.id} conn={conn} />)}
         </div>
       )}
     </div>
   )
 }
 
-// ─── Aggregation Tab ──────────────────────────────────────────────────────────
+// ─── Channels Tab ─────────────────────────────────────────────────────────────
 
-function AggregationTab() {
-  const [form, setForm] = useState({ prefix: 'BATCH', digits: '6', startValue: '1', increment: '1' })
-  const set = (k: string) => (v: string) => setForm(f => ({ ...f, [k]: v }))
-
-  const preview = (() => {
-    const n = parseInt(form.digits) || 6
-    const s = parseInt(form.startValue) || 1
-    const pad = String(s).padStart(n, '0')
-    return form.prefix ? `${form.prefix}-${pad}` : pad
-  })()
-
+function ChannelsTab() {
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <div className="text-sm font-semibold text-gray-900 mb-0.5">Aggregation Order ID Configuration</div>
-        <p className="text-xs text-gray-500 mb-5 leading-relaxed">Define how aggregated order IDs are generated — prefix, length, and sequence.</p>
-
-        <div className="grid grid-cols-2 gap-5">
-          <Field label="Prefix" hint="Optional string prefix for aggregated order IDs.">
-            <input className={inputCls} placeholder="e.g. BATCH" value={form.prefix} onChange={e => set('prefix')(e.target.value)} />
-          </Field>
-          <Field label="Number of Digits" hint="Total digits, padded with leading zeros.">
-            <input className={inputCls} type="number" placeholder="6" value={form.digits} onChange={e => set('digits')(e.target.value)} />
-          </Field>
-          <Field label="Start Value" hint="First numeric value for the sequence.">
-            <input className={inputCls} type="number" placeholder="1" value={form.startValue} onChange={e => set('startValue')(e.target.value)} />
-          </Field>
-          <Field label="Increment" hint="Step between consecutive IDs.">
-            <input className={inputCls} type="number" placeholder="1" value={form.increment} onChange={e => set('increment')(e.target.value)} />
-          </Field>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-gray-400 bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+          <IcoInfo />
+          <span>Global defaults: <strong className="text-gray-600 font-semibold">WMS 1</strong> for both routing &amp; aggregation</span>
         </div>
-
-        <div className="mt-5 pt-5 border-t border-gray-100">
-          <Field label="Preview">
-            <div className="border border-blue-200 rounded-lg px-3 py-2.5 text-sm font-mono font-semibold text-blue-700 bg-blue-50 tracking-widest w-full">
-              {preview}
-            </div>
-          </Field>
-          <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-            IDs are left-padded to match Number of Digits (e.g. 6 digits → max 999,999). Alerts trigger when 90% of the ID range is used.
-          </p>
-        </div>
+        <Button label="Manage Connections" variant="secondary" size="sm" />
       </div>
 
-      <Alert>
-        Orders included in aggregation do not go through routing. Individual orders may still be routed according to routing rules.
-      </Alert>
+      {/* Table header */}
+      <div className="flex items-center px-5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="flex-1">Channel</div>
+        <div className="w-[160px] text-center">Aggregation</div>
+        <div className="w-[140px] text-center">Routing</div>
+        <div className="w-8" />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {CHANNELS.map(ch => <ChannelRow key={ch.id} ch={ch} />)}
+      </div>
     </div>
   )
 }
 
-// ─── Routing Tab ──────────────────────────────────────────────────────────────
+// ─── Order Aggregation Tab ────────────────────────────────────────────────────
 
-function RoutingTab() {
-  const [defaultLocation, setDefaultLocation] = useState('')
-  const [allowMulti, setAllowMulti]           = useState(false)
-  const [allowSplit, setAllowSplit]            = useState(false)
+function OrderAggregationTab() {
+  const [prefix,     setPrefix]     = useState('BATCH')
+  const [digits,     setDigits]     = useState('6')
+  const [startVal,   setStartVal]   = useState('1')
+  const [increment,  setIncrement]  = useState('1')
+
+  const preview = (() => {
+    const n = Math.max(1, parseInt(digits) || 6)
+    const s = parseInt(startVal) || 1
+    return (prefix ? `${prefix}-` : '') + String(s).padStart(n, '0')
+  })()
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
+
+      {/* ID Format */}
       <div>
-        <div className="text-sm font-semibold text-gray-900 mb-0.5">Default Fulfillment Location</div>
-        <p className="text-xs text-gray-500 mb-4 leading-relaxed">Define a fallback location when no routing rule matches an order.</p>
-        <Field label="Default Fulfillment Location (optional)" hint="If not set, orders are routed by rules only.">
-          <SelectField value={defaultLocation} onChange={setDefaultLocation} placeholder="Search fulfillment locations">
-            <option value="wms1">WMS 1</option>
-            <option value="wms2">WMS 2</option>
-          </SelectField>
-        </Field>
-        {defaultLocation && (
-          <button onClick={() => setDefaultLocation('')} className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors">
-            ✕ Clear selection
-          </button>
-        )}
-      </div>
-
-      <div className="border-t border-gray-100" />
-
-      <div>
-        <div className="text-sm font-semibold text-gray-900 mb-0.5">Split Configuration</div>
-        <p className="text-xs text-gray-500 mb-4 leading-relaxed">Control whether orders and line items can be split across multiple fulfillment locations.</p>
-
-        <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-          <div className="flex items-start justify-between gap-4 px-5 py-4 bg-white">
-            <div className="flex-1">
-              <div className="text-sm font-semibold text-gray-900">Allow multiple fulfillment locations for an order</div>
-              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                {allowMulti ? 'Different line items in the same order can use different fulfillment locations.' : 'The entire order must be fulfilled from a single location.'}
-              </p>
-            </div>
-            <Toggle on={allowMulti} onToggle={() => { setAllowMulti(v => !v); if (allowMulti) setAllowSplit(false) }} />
+        <SectionHeader
+          title="Aggregated Order ID Format"
+          subtitle="Define how aggregated order IDs are generated. Changes apply to new batches only."
+        />
+        <Card>
+          <div className="grid grid-cols-2 gap-5 p-1">
+            <Field label="Prefix" hint="Optional string prefix prepended to the numeric part.">
+              <Input value={prefix} onChange={setPrefix} placeholder="e.g. BATCH" />
+            </Field>
+            <Field label="Number of Digits" hint="Total digits, zero-padded on the left.">
+              <Input value={digits} onChange={setDigits} type="number" placeholder="6" />
+            </Field>
+            <Field label="Start Value" hint="First numeric value in the sequence.">
+              <Input value={startVal} onChange={setStartVal} type="number" placeholder="1" />
+            </Field>
+            <Field label="Increment" hint="Step size between consecutive IDs.">
+              <Input value={increment} onChange={setIncrement} type="number" placeholder="1" />
+            </Field>
           </div>
 
-          <div className={`flex items-start justify-between gap-4 px-5 py-4 transition-colors ${!allowMulti ? 'opacity-50 bg-gray-50/70' : 'bg-white'}`}>
-            <div className="flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-gray-900">Allow multiple fulfillment locations for a line item</span>
-                {!allowMulti && (
-                  <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                )}
+          {/* Preview */}
+          <div className="mt-5 pt-5 border-t border-gray-100 px-1">
+            <Field label="Live Preview">
+              <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <span className="text-sm font-mono font-bold text-blue-700 tracking-widest">{preview}</span>
+                <span className="text-xs text-blue-400 ml-auto">First aggregated order ID</span>
               </div>
-              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                {allowSplit ? 'A single line item can be split across locations when inventory is insufficient.' : 'Each line item is fulfilled from one location.'}
-              </p>
-              {!allowMulti && (
-                <p className="text-xs text-amber-600 mt-1.5 font-medium">
-                  Enable "Allow multiple fulfillment locations for an order" to unlock this setting.
-                </p>
-              )}
-            </div>
-            <Toggle on={allowSplit} onToggle={() => setAllowSplit(v => !v)} disabled={!allowMulti} />
+            </Field>
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+              IDs are left-padded to match Number of Digits. Capacity: {10 ** (parseInt(digits) || 6) - 1} max orders.
+              Alerts trigger at 90% usage.
+            </p>
           </div>
-        </div>
+        </Card>
       </div>
+
+      {/* Aggregation Window */}
+      <div>
+        <SectionHeader
+          title="Aggregation Window"
+          subtitle="Control when orders are collected into a batch."
+        />
+        <Card>
+          <div className="divide-y divide-gray-100">
+            {[
+              { label: 'Auto-close after',       value: '30 minutes', hint: 'Batch closes automatically after this duration from the first order.' },
+              { label: 'Maximum orders per batch', value: '200 orders', hint: 'Batch closes when this limit is reached, even before the time window.' },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between py-4 px-1 first:pt-1 last:pb-1">
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">{row.label}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{row.hint}</div>
+                </div>
+                <div className="text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg">{row.value}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <InfoBanner>
+        Orders included in aggregation do not go through routing. Individual orders that don't meet aggregation criteria may still be routed.
+      </InfoBanner>
+    </div>
+  )
+}
+
+// ─── Order Routing Tab ────────────────────────────────────────────────────────
+
+function OrderRoutingTab() {
+  const [defaultLoc,  setDefaultLoc]  = useState('')
+  const [allowMulti,  setAllowMulti]  = useState(false)
+  const [allowSplit,  setAllowSplit]  = useState(false)
+  const [rules,       setRules]       = useState<RoutingRule[]>(DEFAULT_RULES)
+
+  const addRule = () => setRules(r => [
+    ...r,
+    { id: `r${Date.now()}`, priority: r.length + 1, condField: 'country', condOp: 'equals', condValue: '', action: 'WMS 1' },
+  ])
+  const removeRule = (id: string) => setRules(r => r.filter(x => x.id !== id).map((x, i) => ({ ...x, priority: i + 1 })))
+  const updateRule = (id: string, patch: Partial<RoutingRule>) =>
+    setRules(r => r.map(x => x.id === id ? { ...x, ...patch } : x))
+
+  return (
+    <div className="flex flex-col gap-8">
+
+      {/* Default Fulfillment Location */}
+      <div>
+        <SectionHeader
+          title="Default Fulfillment Location"
+          subtitle="Fallback location used when no routing rule matches an order."
+        />
+        <Card>
+          <div className="p-1">
+            <Field label="Default Fulfillment Location" hint="If not set, unmatched orders are held for manual review.">
+              <Select value={defaultLoc} onChange={setDefaultLoc} placeholder="Search fulfillment locations…">
+                <option value="wms1">WMS 1</option>
+                <option value="wms2">WMS 2</option>
+              </Select>
+            </Field>
+            {defaultLoc && (
+              <button onClick={() => setDefaultLoc('')} className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors">
+                ✕ Clear selection
+              </button>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Split Configuration */}
+      <div>
+        <SectionHeader
+          title="Split Configuration"
+          subtitle="Control whether orders and line items can span multiple fulfillment locations."
+        />
+        <Card style={{ padding: 0 }}>
+          <div className="divide-y divide-gray-100">
+
+            <div className="flex items-start justify-between gap-6 px-5 py-4">
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-gray-900">Allow multiple fulfillment locations for an order</div>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {allowMulti
+                    ? 'Different line items in the same order can use different locations.'
+                    : 'The entire order must be fulfilled from a single location.'}
+                </p>
+              </div>
+              <Toggle on={allowMulti} onToggle={() => { setAllowMulti(v => !v); if (allowMulti) setAllowSplit(false) }} />
+            </div>
+
+            <div className={`flex items-start justify-between gap-6 px-5 py-4 transition-opacity ${!allowMulti ? 'opacity-50' : ''}`}>
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-gray-900">Allow multiple fulfillment locations for a line item</span>
+                  {!allowMulti && (
+                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {allowSplit
+                    ? 'A single line item can be split across locations when inventory is low.'
+                    : 'Each line item is fulfilled from one location only.'}
+                </p>
+                {!allowMulti && <p className="text-xs text-amber-600 mt-1.5 font-medium">Requires "Allow multiple locations for an order" to be enabled.</p>}
+              </div>
+              <Toggle on={allowSplit} onToggle={() => setAllowSplit(v => !v)} disabled={!allowMulti} />
+            </div>
+
+          </div>
+        </Card>
+      </div>
+
+      {/* Routing Rules */}
+      <div>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">Routing Rules</h2>
+            <p className="text-xs text-gray-500 mt-1">Rules are evaluated in priority order. First match wins.</p>
+          </div>
+          <Button label="+ Add Rule" variant="secondary" size="sm" onClick={addRule} />
+        </div>
+
+        <Card style={{ padding: 0 }}>
+          {/* Table header */}
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wider rounded-t-xl">
+            <div className="w-5" />
+            <div className="w-8 text-center">#</div>
+            <div className="flex-1">Condition</div>
+            <div className="w-32">Route To</div>
+            <div className="w-8" />
+          </div>
+
+          {rules.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-700">No routing rules</p>
+              <p className="text-xs text-gray-400 mt-1">All orders will use the default fulfillment location.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {rules.map(rule => (
+                <div key={rule.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors group">
+                  <div className="w-5 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+                    <IcoGrip />
+                  </div>
+                  <div className="w-8 text-center">
+                    <span className="text-xs font-bold text-gray-400 bg-gray-100 rounded-full w-5 h-5 inline-flex items-center justify-center">
+                      {rule.priority}
+                    </span>
+                  </div>
+
+                  {/* Condition */}
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <select
+                      value={rule.condField}
+                      onChange={e => updateRule(rule.id, { condField: e.target.value })}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-32"
+                    >
+                      <option value="country">Country</option>
+                      <option value="tag">Order Tag</option>
+                      <option value="channel">Channel</option>
+                      <option value="sku">SKU</option>
+                      <option value="total">Order Total</option>
+                    </select>
+                    <select
+                      value={rule.condOp}
+                      onChange={e => updateRule(rule.id, { condOp: e.target.value })}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-28"
+                    >
+                      <option value="equals">equals</option>
+                      <option value="not_equals">not equals</option>
+                      <option value="contains">contains</option>
+                      <option value="starts_with">starts with</option>
+                      <option value="greater_than">greater than</option>
+                    </select>
+                    <input
+                      value={rule.condValue}
+                      onChange={e => updateRule(rule.id, { condValue: e.target.value })}
+                      placeholder="value…"
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 flex-1"
+                    />
+                  </div>
+
+                  {/* Action */}
+                  <div className="w-32">
+                    <select
+                      value={rule.action}
+                      onChange={e => updateRule(rule.id, { action: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="WMS 1">WMS 1</option>
+                      <option value="WMS 2">WMS 2</option>
+                    </select>
+                  </div>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => removeRule(rule.id)}
+                    className="w-8 flex items-center justify-center text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <IcoTrash />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Footer */}
+          {rules.length > 0 && (
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 rounded-b-xl">
+              <p className="text-xs text-gray-400">
+                <strong className="text-gray-500">{rules.length} rule{rules.length !== 1 ? 's' : ''}</strong> · Drag to reorder priority · Unmatched orders fall back to default location
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
+
     </div>
   )
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export default function ChannelManagementAndRouting() {
-  const [activeTab, setActiveTab] = useState<'aggregation' | 'routing'>('aggregation')
+type Tab = 'channels' | 'aggregation' | 'routing'
 
-  const tabCls = (t: string) =>
-    `px-5 py-3.5 text-xs font-semibold border-b-[3px] transition-colors ${
-      activeTab === t
-        ? 'border-blue-600 text-blue-600'
-        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-    }`
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'channels',    label: 'Channels' },
+  { id: 'aggregation', label: 'Order Aggregation' },
+  { id: 'routing',     label: 'Order Routing' },
+]
+
+export default function ChannelManagementAndRouting() {
+  const [tab, setTab] = useState<Tab>('channels')
 
   return (
     <AppShell>
-      <div className="max-w-5xl mx-auto px-8 py-8">
+      <div className="max-w-5xl mx-auto px-8 pt-8 pb-16">
 
-        {/* ── Page Header ── */}
-        <div className="mb-8">
-          <p className="text-xs text-gray-400 mb-1.5">
-            <span className="hover:text-gray-600 cursor-pointer">Settings</span>
-            <span className="mx-1.5">/</span>
-            <span className="text-gray-600">Channel Management</span>
+        {/* Page header */}
+        <div className="mb-6">
+          <p className="text-xs text-gray-400 mb-2">
+            <span className="hover:text-gray-600 cursor-pointer transition-colors">Settings</span>
+            <span className="mx-1.5 text-gray-300">/</span>
+            <span className="text-gray-600 font-medium">Channel Management</span>
           </p>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900">Channel Management</h1>
               <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-xl">
-                Manage which connections participate in Order Aggregation and Order Routing.
+                Configure which connections participate in order aggregation and routing, and define global rules.
               </p>
             </div>
-            <div className="flex-shrink-0 mt-1">
-              <Badge variant="brand">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                Active subscriptions only
-              </Badge>
-            </div>
+            <Badge variant="brand">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              Active subscriptions only
+            </Badge>
           </div>
         </div>
 
-        <div className="flex flex-col gap-8">
-
-          {/* ── Section 1: Channels ── */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Channels</h2>
-              {/* Global defaults pill — scannable reference */}
-              <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Global defaults:
-                <span className="font-semibold text-gray-600">WMS 1</span>
-                for both routing &amp; aggregation
-              </div>
-            </div>
-
-            {/* Column headers — aligned to connection row columns */}
-            <div className="flex items-center px-5 pb-2.5">
-              <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Channel</div>
-              <div className="flex gap-0 pr-8">
-                <div className="w-[130px] text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Aggregation</div>
-                <div className="w-[120px] text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Routing</div>
-              </div>
-              <div className="w-4" />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {channels.map(ch => (
-                <ChannelAccordion key={ch.id} channel={ch} />
-              ))}
-            </div>
+        {/* Tab bar */}
+        <div className="border-b border-gray-200 mb-8 -mx-1 px-1">
+          <div className="flex gap-0">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-5 py-3 text-sm font-semibold border-b-[3px] transition-colors whitespace-nowrap
+                  ${tab === t.id
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'}`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-
-          {/* ── Section 2: Order Aggregation & Routing ── */}
-          <div>
-            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">
-              Order Aggregation &amp; Routing
-            </h2>
-
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex border-b border-gray-200 bg-gray-50/60 px-2">
-                <button className={tabCls('aggregation')} onClick={() => setActiveTab('aggregation')}>
-                  Order Aggregation
-                </button>
-                <button className={tabCls('routing')} onClick={() => setActiveTab('routing')}>
-                  Order Routing
-                </button>
-              </div>
-
-              <div className="px-7 py-7">
-                {activeTab === 'aggregation' ? <AggregationTab /> : <RoutingTab />}
-              </div>
-
-              <div className="flex justify-end items-center gap-3 px-7 py-4 border-t border-gray-100 bg-gray-50/60">
-                <button className="inline-flex items-center justify-center px-5 h-9 rounded-lg bg-white text-gray-700 text-sm font-semibold border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors">
-                  Cancel
-                </button>
-                <button className="inline-flex items-center justify-center px-5 h-9 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm">
-                  Save changes
-                </button>
-              </div>
-            </div>
-          </div>
-
         </div>
+
+        {/* Tab content */}
+        {tab === 'channels'    && <ChannelsTab />}
+        {tab === 'aggregation' && <OrderAggregationTab />}
+        {tab === 'routing'     && <OrderRoutingTab />}
+
+        {/* Footer actions — only on config tabs */}
+        {tab !== 'channels' && (
+          <div className="flex items-center justify-end gap-3 mt-10 pt-6 border-t border-gray-200">
+            <Button label="Cancel" variant="secondary" />
+            <Button label="Save changes" variant="primary" />
+          </div>
+        )}
+
       </div>
     </AppShell>
   )
